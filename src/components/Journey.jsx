@@ -13,6 +13,9 @@ const MILESTONES = [
 ]
 
 const AWARDS = [
+  { img: 'pertamuda-award', alt: 'Tim PE-NOVTRA menerima dana pembinaan di Awarding Night Pertamuda Seed and Scale 2025',
+    tag: 'Pertamuda Seed & Scale 2025', t: 'Top 3 Energy Founder',
+    d: 'Peringkat 2 subkategori Energy Future dari Pertamina, dengan dana pembinaan Rp35 juta. Diumumkan di Awarding Night, Yogyakarta, 28 Oktober 2025.' },
   { img: 'hult', alt: 'Tim PE-NOVTRA di Hult Prize Indonesia', tag: 'Hult Prize', t: 'Top 39 Indonesia',
     d: 'Bagian dari 1.500 startup terbaik dunia dari 18.000+ tim di 130+ negara.' },
   { img: 'fowler', alt: 'Tim PE-NOVTRA di Fowler GSIC, San Diego', tag: 'Fowler GSIC 2026', t: 'Global Finalist',
@@ -88,7 +91,7 @@ export default function Journey() {
       </div>
 
       <div className="wrap">
-        <div className="grid grid-cols-3 gap-5 mt-[clamp(60px,7vw,100px)] max-lap:grid-cols-2 max-xs:grid-cols-1">
+        <div className="grid grid-cols-3 gap-5 mt-[clamp(60px,7vw,100px)] max-tab:grid-cols-1">
           {AWARDS.map(a => (
             <Reveal as="article" key={a.t} className="flex flex-col overflow-hidden rounded-[32px] bg-white border border-line">
               <img src={`/assets/${a.img}.webp`} alt={a.alt} loading="lazy" className="aspect-video object-cover w-full" />
@@ -99,18 +102,31 @@ export default function Journey() {
               </div>
             </Reveal>
           ))}
-          <Reveal className="flex flex-col rounded-[32px] bg-forest text-white p-7 max-lap:col-span-full">
-            <Eyebrow className="text-white/60 mb-auto">Validasi pasar</Eyebrow>
-            <dl className="mt-[30px] grid">
-              {TRACTION.map(([n, label]) => (
-                <div key={label} className="flex items-baseline gap-4 py-3 border-t border-forest-line">
-                  <dt className="text-[44px] font-semibold tracking-[-.04em] text-lime-2 min-w-[2.6ch] tabular-nums leading-none"><CountUp to={n} /></dt>
-                  <dd className="m-0 text-white/75 text-[14px]">{label}</dd>
-                </div>
-              ))}
-            </dl>
-          </Reveal>
         </div>
+
+        {/* market validation: one horizontal band so the numbers read side by side */}
+        <Reveal className={cx(
+          'relative overflow-hidden mt-5 grid grid-cols-[1.15fr_repeat(3,1fr)] items-stretch rounded-[32px] bg-forest text-white px-9 py-8',
+          'max-lap:grid-cols-3 max-xs:grid-cols-1 max-xs:px-7',
+          'before:absolute before:-right-24 before:-top-24 before:w-72 before:h-72 before:rounded-full before:bg-[radial-gradient(closest-side,rgba(154,205,43,.18),transparent)]'
+        )}>
+          <div className="relative self-center pr-8 max-lap:col-span-full max-lap:pr-0 max-lap:pb-7">
+            <Eyebrow className="text-white/60 mb-3">Validasi pasar</Eyebrow>
+            <p className="text-[clamp(20px,2vw,26px)] font-semibold leading-[1.25] tracking-[-.02em] max-w-[16ch]">
+              Diuji langsung ke <em className="text-lime-2">calon pembeli.</em>
+            </p>
+          </div>
+          {TRACTION.map(([n, label], i) => (
+            <div key={label} className={cx(
+              'relative grid content-center gap-2 pl-8 border-l border-forest-line',
+              i === 0 && 'max-lap:pl-0 max-lap:border-l-0',
+              'max-xs:pl-0 max-xs:border-l-0 max-xs:border-t max-xs:pt-5 max-xs:mt-5'
+            )}>
+              <span className="text-[clamp(44px,5vw,64px)] font-semibold tracking-[-.045em] text-lime-2 tabular-nums leading-none"><CountUp to={n} /></span>
+              <span className="text-white/75 text-[14px] max-w-[18ch] min-h-[2lh]">{label}</span>
+            </div>
+          ))}
+        </Reveal>
 
         <Reveal className="mt-5 grid grid-cols-[200px_1fr] items-center gap-[30px] rounded-[32px] bg-white border border-line px-8 py-7 max-tab:grid-cols-1">
           <Eyebrow>Didukung oleh</Eyebrow>

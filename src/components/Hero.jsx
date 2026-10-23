@@ -181,9 +181,10 @@ export default function Hero() {
             <PulseDot />2-in-1 Smart Modular Growing System
           </Pill>
           <h1 className="text-[clamp(40px,4.9vw,80px)] font-semibold tracking-[-.04em] leading-[1.02]">
+            <span className="sr-only">PE-NOVTRA, alat berkebun 2-in-1 media tanam dan hidroponik: </span>
             <span className="block overflow-hidden pb-[.06em]">
               <span className="inline-block animate-line-up" style={{ animationDelay: '.18s' }}>Menanam tanpa batas,</span>
-            </span>
+            </span>{' '}
             <span className="block overflow-hidden pb-[.06em]">
               <span className="inline-block animate-line-up" style={{ animationDelay: '.3s' }}><em className="text-lime-2 font-bold">tanpa cemas.</em></span>
             </span>

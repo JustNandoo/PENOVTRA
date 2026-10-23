@@ -22,6 +22,18 @@ const AWARDS = [
     d: 'Finalis global kompetisi Fowler Global Social Innovation Challenge di San Diego, USA.' },
 ]
 
+const PARTNERS = [
+  { img: 'pertamuda', name: 'Pertamuda' },
+  { img: 'brics', name: 'BRICS+ Youth Innovation Summit' },
+  { img: 'kadin-dumai', name: 'Kadin Kota Dumai' },
+  { img: 'hipmi-pens', name: 'HIPMI Perguruan Tinggi Politeknik Elektronika Negeri Surabaya' },
+  { img: 'mitra', name: 'Mitra pendukung' },
+  { img: 'apmi', name: 'APMI, Asosiasi Planters Muda Indonesia' },
+  { img: 'ram-harapan', name: 'RAM Harapan' },
+  { img: 'p4s-laksamana-tani', name: 'P4S Laksamana Tani' },
+  { img: 'pensky', name: 'Pensky Venture' },
+]
+
 const TRACTION = [[20, 'wawancara calon pembeli'], [17, 'menerima harga'], [150, 'produk NovGrow terjual']]
 
 /* horizontal timeline you can drag with the mouse (touch uses native scrolling) */
@@ -128,10 +140,24 @@ export default function Journey() {
           ))}
         </Reveal>
 
-        <Reveal className="mt-5 grid grid-cols-[200px_1fr] items-center gap-[30px] rounded-[32px] bg-white border border-line px-8 py-7 max-tab:grid-cols-1">
-          <Eyebrow>Didukung oleh</Eyebrow>
-          <img src="/assets/supporters.webp" loading="lazy" className="w-full max-w-[520px] justify-self-center"
-            alt="Pendukung: Pertamuda, BRICS+ Youth Innovation Summit, Kadin Kota Dumai, HIPMI Perguruan Tinggi PENS, APMI, RAM Harapan, P4S Laksamana Tani, Pensky Venture" />
+        <Reveal className="mt-5 grid grid-cols-[minmax(0,.85fr)_minmax(0,2fr)] items-center gap-10 rounded-[32px] bg-white border border-line p-8 max-tab:grid-cols-1 max-tab:gap-7 max-xs:p-5">
+          <div className="max-tab:px-1">
+            <Eyebrow className="text-muted mb-3">Didukung oleh</Eyebrow>
+            <h3 className="text-[clamp(22px,2.2vw,30px)] text-forest leading-[1.15] max-w-[14ch]">
+              Tumbuh bersama <em>ekosistem yang tepat.</em>
+            </h3>
+            <p className="mt-3 text-muted text-[14.5px] max-w-[34ch]">
+              Program, komunitas, dan mitra yang mendukung perjalanan PE-NOVTRA.
+            </p>
+          </div>
+          <ul className="grid grid-cols-3 gap-px overflow-hidden rounded-[20px] border border-line bg-line">
+            {PARTNERS.map(p => (
+              <li key={p.img} className="group grid place-items-center bg-white aspect-[16/10] p-5 max-xs:aspect-[4/3] max-xs:p-3">
+                <img src={`/assets/partners/${p.img}.webp`} alt={p.name} loading="lazy"
+                  className="max-h-[88px] max-w-[74%] w-auto h-auto object-contain transition-[scale] duration-500 ease-soft group-hover:scale-[1.06] max-xs:max-h-[52px] max-xs:max-w-[86%]" />
+              </li>
+            ))}
+          </ul>
         </Reveal>
       </div>
     </section>

@@ -175,7 +175,8 @@ export default function Hero() {
       <canvas ref={canvasRef} aria-hidden="true" className="absolute inset-0 w-full h-full -z-1" />
       <div aria-hidden="true" className="pointer-events-none absolute -z-1 left-1/2 -bottom-[30%] w-[120vw] h-[90vh] -translate-x-1/2 bg-[radial-gradient(closest-side,rgba(128,178,20,.22),rgba(128,178,20,.06)_55%,transparent)]" />
 
-      <div className="wrap relative z-3 pt-[clamp(104px,13vh,136px)]">
+      {/* headline and intro share one grid row so they can never overlap; below 1100px they stack */}
+      <div className="wrap relative z-3 pt-[clamp(104px,13vh,136px)] lap:grid lap:grid-cols-[minmax(0,1fr)_340px] lap:items-end lap:gap-8">
         <div>
           <Pill tone="glass" className="mb-[22px] animate-fade-up" style={{ animationDelay: '.1s' }}>
             <PulseDot />2-in-1 Smart Modular Growing System
@@ -190,7 +191,7 @@ export default function Hero() {
             </span>
           </h1>
         </div>
-        <div className="absolute right-[var(--gutter)] bottom-1 max-w-[380px] animate-fade-up max-tab:static max-tab:mt-[22px]" style={{ animationDelay: '.55s' }}>
+        <div className="max-w-[380px] pb-1 animate-fade-up max-lap:mt-[22px]" style={{ animationDelay: '.55s' }}>
           <p className="text-white/72 text-[16px] font-light mb-6">
             Media tanam dan hidroponik dalam satu bak modular, terlindung dari hama dan cuaca ekstrem, dan bisa dipantau langsung dari ponsel.
           </p>
@@ -209,9 +210,11 @@ export default function Hero() {
         <div
           ref={deviceRef}
           className={cx(
-            'relative z-2 w-[min(58vw,820px,calc((100svh_-_390px)_*_1.22))] min-w-[440px] mb-[clamp(60px,8vh,84px)] animate-device-in',
+            // height left after the headline block (padding + pill + two title lines), a 56px gap
+            // for the sensor chips, and the bottom margin; × 1.225 turns that height into width
+            'relative z-2 w-[min(58vw,820px,calc((max(100svh,760px)_-_clamp(104px,13vh,136px)_-_61px_-_2.16_*_clamp(40px,4.9vw,80px)_-_56px_-_clamp(60px,8vh,84px))_*_1.225))] min-w-[400px] mb-[clamp(60px,8vh,84px)] animate-device-in',
             "after:content-[''] after:absolute after:-z-1 after:left-[8%] after:right-[4%] after:-bottom-3.5 after:h-[34px] after:bg-[radial-gradient(closest-side,rgba(0,0,0,.55),transparent)] after:blur-[6px]",
-            'max-tab:w-[min(92vw,640px)] max-tab:min-w-0 max-tab:mt-[90px]'
+            'max-lap:mt-[56px] max-tab:w-[min(92vw,640px)] max-tab:min-w-0 max-tab:mt-[90px]'
           )}
         >
           <img

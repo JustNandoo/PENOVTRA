@@ -13,8 +13,11 @@ cp .env.example .env       # lalu sesuaikan DATABASE_URL
 createdb penovtra
 npm run db:migrate         # buat tabel
 npm run db:seed            # isi kategori dan produk dari server/db/catalog-data.js
+npm run db:seed:demo       # opsional: akun demo Gilang untuk mencoba login (hanya database lokal)
 npm run dev                # web di :5174 + API di :3001 (Vite meneruskan /api ke API)
 ```
+
+Akun demo: email dan kata sandinya ada di `server/db/seed-demo.js`. Skrip ini menolak berjalan selain ke database localhost.
 
 Lainnya: `npm run build` (hasil produksi ke `dist/`), `npm run preview`, `npm run db:studio` (lihat isi database di browser).
 

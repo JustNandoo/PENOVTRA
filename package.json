@@ -12,6 +12,7 @@
     "db:generate": "node --env-file=.env node_modules/drizzle-kit/bin.cjs generate",
     "db:migrate": "node --env-file=.env server/db/migrate.js",
     "db:seed": "node --env-file=.env server/db/seed.js",
+    "db:seed:demo": "node --env-file=.env server/db/seed-demo.js",
     "db:studio": "node --env-file=.env node_modules/drizzle-kit/bin.cjs studio"
   },
   "dependencies": {

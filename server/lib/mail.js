@@ -1,8 +1,45 @@
-/* Email delivery. With RESEND_API_KEY set, mail goes out through Resend's
-   HTTP API. Without it (local development) the message is printed in the
-   API terminal so codes and links can still be used. */
+import nodemailer from 'nodemailer'
+import { fail } from './http.js'
+
+/* Email delivery, first match wins:
+   1. SMTP (SMTP_USER + SMTP_PASS), e.g. Gmail with an app password
+   2. Resend's HTTP API (RESEND_API_KEY)
+   3. nothing configured: printed in the API terminal (local development) */
+
+const from = () => process.env.MAIL_FROM || (process.env.SMTP_USER ? `PE-NOVTRA <${process.env.SMTP_USER}>` : 'PE-NOVTRA <noreply@penovtra.com>')
+
+let transport
+function smtp() {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return null
+  const port = Number(process.env.SMTP_PORT || 465)
+  transport ??= nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port,
+    secure: port === 465,
+    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS.replace(/\s+/g, '') },
+  })
+  return transport
+}
+
+/* Checks the SMTP login without sending anything */
+export async function verifyMail() {
+  const t = smtp()
+  if (!t) return 'SMTP belum diisi'
+  await t.verify()
+  return `SMTP siap (${process.env.SMTP_USER})`
+}
 
 export async function sendMail({ to, subject, text }) {
+  const t = smtp()
+  if (t) {
+    try {
+      await t.sendMail({ from: from(), to, subject, text })
+    } catch (e) {
+      console.error('Gagal mengirim email lewat SMTP:', e.message)
+      fail(502, 'Email belum bisa dikirim. Coba lagi sebentar.')
+    }
+    return
+  }
   const key = process.env.RESEND_API_KEY
   if (!key) {
     console.log(`\n✉️  [email ke ${to}] ${subject}\n${text}\n`)
@@ -11,11 +48,11 @@ export async function sendMail({ to, subject, text }) {
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: process.env.MAIL_FROM || 'PE-NOVTRA <noreply@penovtra.com>', to, subject, text }),
+    body: JSON.stringify({ from: from(), to, subject, text }),
   })
   if (!res.ok) {
     console.error('Gagal mengirim email:', res.status, await res.text())
-    throw new Error('Email gagal dikirim')
+    fail(502, 'Email belum bisa dikirim. Coba lagi sebentar.')
   }
 }
 

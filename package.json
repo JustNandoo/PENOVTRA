@@ -8,6 +8,7 @@
     "dev:web": "vite",
     "dev:api": "node --env-file=.env --watch-path=server server/dev.js",
     "build": "vite build",
+    "vercel-build": "node server/db/deploy.js && vite build",
     "preview": "vite preview",
     "db:generate": "node --env-file=.env node_modules/drizzle-kit/bin.cjs generate",
     "db:migrate": "node --env-file=.env server/db/migrate.js",

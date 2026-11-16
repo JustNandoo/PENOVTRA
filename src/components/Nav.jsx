@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useScrollFrame } from '../hooks/useScrollFrame'
 import { cx } from './ui'
 
@@ -55,6 +56,10 @@ export default function Nav() {
             {label}
           </a>
         ))}
+        <Link to="/marketplace" onClick={() => setOpen(false)}
+          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-[14px] font-medium transition-[background-color] duration-200 hover:bg-[rgba(127,127,127,.12)] max-lap:text-[18px] max-lap:px-1.5 max-lap:py-2.5">
+          Marketplace <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-lime-2" />
+        </Link>
       </nav>
 
       <a href="#kontak" className="hidden lap:inline px-[18px] py-2.5 rounded-full bg-lime text-forest-3 text-[14px] font-medium whitespace-nowrap">

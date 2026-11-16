@@ -1,102 +1,108 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { DEMO_USER, SEED_ORDERS, lineItems, subtotalOf } from './data'
+import { api } from './api'
 
-/* Client-side state for the UI slice: cart, a mock signed-in user and orders.
-   Kept in localStorage so a refresh doesn't empty the cart. */
+/* Marketplace state:
+   - catalog + categories, loaded from /api once per visit
+   - the signed-in user, from /api/auth/me (session cookie)
+   - the cart, kept in localStorage so guests can shop before signing in;
+     prices shown here are display only, the server re-prices at checkout */
 
-const KEY = 'pnv-market-v1'
-const START = {
-  cart: [
-    { slug: 'pe-novtra-2-in-1', variant: 'std', qty: 1 },
-    { slug: 'nutrisi-ab-mix', qty: 2 },
-    { slug: 'media-tanam-organik', qty: 1 },
-  ],
-  user: null,
-  orders: SEED_ORDERS,
-}
+const CART_KEY = 'pnv-cart-v2'
+const keyOf = l => l.slug + (l.variant ? ':' + l.variant : '')
 
-function load() {
+function loadCart() {
   try {
-    const raw = localStorage.getItem(KEY)
-    return raw ? { ...START, ...JSON.parse(raw) } : START
+    const raw = JSON.parse(localStorage.getItem(CART_KEY) || '[]')
+    return Array.isArray(raw) ? raw.filter(l => l && typeof l.slug === 'string' && l.qty > 0) : []
   } catch {
-    return START
+    return []
   }
 }
 
 const StoreCtx = createContext(null)
-const keyOf = l => l.slug + (l.variant ? ':' + l.variant : '')
 
 export function StoreProvider({ children }) {
-  const [state, setState] = useState(load)
+  const [cart, setCart] = useState(loadCart)
+  const [user, setUser] = useState(null)
+  const [authReady, setAuthReady] = useState(false)
+  const [catalog, setCatalog] = useState([])
+  const [categories, setCategories] = useState([])
+  const [catalogState, setCatalogState] = useState('loading') // loading | ready | error
   const [toast, setToast] = useState(null)
-  const clearToast = useCallback(() => setToast(null), [])
 
   useEffect(() => {
-    try { localStorage.setItem(KEY, JSON.stringify(state)) } catch { /* storage may be blocked */ }
-  }, [state])
+    try { localStorage.setItem(CART_KEY, JSON.stringify(cart)) } catch { /* storage may be blocked */ }
+  }, [cart])
+
+  const refreshUser = useCallback(async () => {
+    try {
+      const { user } = await api('/auth/me')
+      setUser(user)
+      return user
+    } catch {
+      setUser(null)
+      return null
+    } finally {
+      setAuthReady(true)
+    }
+  }, [])
+
+  const loadCatalog = useCallback(async () => {
+    setCatalogState('loading')
+    try {
+      const [p, c] = await Promise.all([api('/products'), api('/categories')])
+      setCatalog(p.products)
+      setCategories(c.categories)
+      setCatalogState('ready')
+    } catch {
+      setCatalogState('error')
+    }
+  }, [])
+
+  useEffect(() => { refreshUser(); loadCatalog() }, [refreshUser, loadCatalog])
+
+  const productBySlug = useCallback(slug => catalog.find(p => p.slug === slug), [catalog])
 
   const addToCart = useCallback((slug, qty = 1, variant) => {
-    setState(s => {
+    setCart(c => {
       const k = slug + (variant ? ':' + variant : '')
-      const has = s.cart.some(l => keyOf(l) === k)
-      const cart = has
-        ? s.cart.map(l => keyOf(l) === k ? { ...l, qty: Math.min(10, l.qty + qty) } : l)
-        : [...s.cart, { slug, variant, qty }]
-      return { ...s, cart }
+      return c.some(l => keyOf(l) === k)
+        ? c.map(l => keyOf(l) === k ? { ...l, qty: Math.min(10, l.qty + qty) } : l)
+        : [...c, { slug, variant, qty: Math.min(10, qty) }]
     })
     setToast({ slug, at: Date.now() })
   }, [])
-
   const setQty = useCallback((key, qty) => {
-    setState(s => ({ ...s, cart: s.cart.map(l => keyOf(l) === key ? { ...l, qty: Math.max(1, Math.min(10, qty)) } : l) }))
+    setCart(c => c.map(l => keyOf(l) === key ? { ...l, qty: Math.max(1, Math.min(10, qty)) } : l))
   }, [])
-  const removeLine = useCallback(key => setState(s => ({ ...s, cart: s.cart.filter(l => keyOf(l) !== key) })), [])
+  const removeLine = useCallback(key => setCart(c => c.filter(l => keyOf(l) !== key)), [])
+  const clearCart = useCallback(() => setCart([]), [])
+  const clearToast = useCallback(() => setToast(null), [])
 
-  const login = useCallback(() => setState(s => ({ ...s, user: DEMO_USER })), [])
-  const logout = useCallback(() => setState(s => ({ ...s, user: null })), [])
-
-  const placeOrder = useCallback(({ shipping, insured, pay, address }) => {
-    const n = String(Math.floor(40 + Math.random() * 59)).padStart(4, '0')
-    const id = `PNV-2611-${n}`
-    setState(s => ({
-      ...s,
-      cart: [],
-      orders: [{
-        id, date: '16 Nov 2026', status: 'bayar', lines: s.cart, shipping, insured, pay, address,
-        resi: '', eta: 'menunggu pembayaran',
-        events: [['Sekarang', 'Menunggu pembayaran', 'Selesaikan dalam 24 jam', 'now'], ['16 Nov · 14.30', 'Pesanan dibuat', 'Checkout berhasil', 'done']],
-      }, ...s.orders],
-    }))
-    return id
-  }, [])
-
-  const markPaid = useCallback(id => {
-    setState(s => ({
-      ...s,
-      orders: s.orders.map(o => o.id !== id || o.status !== 'bayar' ? o : {
-        ...o, status: 'proses', eta: 'estimasi tiba 20–22 Nov 2026',
-        events: [
-          ['Berikutnya', 'Dikirim', 'Nomor resi muncul di sini', 'next'],
-          ['Berikutnya', 'Dikemas', 'Gudang Surabaya', 'next'],
-          ['16 Nov · 14.41', 'Pembayaran diterima', o.pay, 'now'],
-          ['16 Nov · 14.30', 'Pesanan dibuat', 'Checkout berhasil', 'done'],
-        ],
-      }),
-    }))
+  const logout = useCallback(async () => {
+    await api('/auth/logout', { method: 'POST' }).catch(() => {})
+    setUser(null)
   }, [])
 
   const value = useMemo(() => {
-    const items = lineItems(state.cart)
+    // join cart lines with live catalog data; lines for removed products are skipped
+    const items = cart.flatMap(l => {
+      const product = catalog.find(p => p.slug === l.slug)
+      if (!product || product.soon) return []
+      const v = product.variants?.find(x => x.id === l.variant)
+      return [{ ...l, product, variantName: v?.name, price: v?.price ?? product.price, key: keyOf(l) }]
+    })
     return {
-      ...state,
-      items,
+      cart, items,
       count: items.reduce((a, i) => a + i.qty, 0),
-      subtotal: subtotalOf(items),
+      subtotal: items.reduce((a, i) => a + i.price * i.qty, 0),
+      user, setUser, authReady, refreshUser, logout,
+      catalog, categories, catalogState, loadCatalog, productBySlug,
+      categoryLabel: id => categories.find(c => c.id === id)?.label ?? '',
       toast, clearToast,
-      addToCart, setQty, removeLine, login, logout, placeOrder, markPaid,
+      addToCart, setQty, removeLine, clearCart,
     }
-  }, [state, toast, clearToast, addToCart, setQty, removeLine, login, logout, placeOrder, markPaid])
+  }, [cart, catalog, categories, catalogState, user, authReady, toast, refreshUser, logout, loadCatalog, productBySlug, clearToast, addToCart, setQty, removeLine, clearCart])
 
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>
 }

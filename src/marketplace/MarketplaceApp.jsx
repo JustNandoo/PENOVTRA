@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { StoreProvider, useStore } from './store'
 import MarketNav from './components/MarketNav'
-import { CartToast } from './components/atoms'
+import { CartToast, PageLoader } from './components/atoms'
 import { Footer } from '../components/Closing'
 import Catalog from './pages/Catalog'
 import ProductDetail from './pages/ProductDetail'
@@ -21,9 +21,10 @@ function ScrollToTop() {
 
 /* Pages that need an account send guests to Masuk and come back afterwards */
 function RequireUser({ children }) {
-  const { user } = useStore()
-  const { pathname } = useLocation()
-  if (!user) return <Navigate to={`/marketplace/masuk?next=${encodeURIComponent(pathname)}`} replace />
+  const { user, authReady } = useStore()
+  const { pathname, search } = useLocation()
+  if (!authReady) return <PageLoader />
+  if (!user) return <Navigate to={`/marketplace/masuk?next=${encodeURIComponent(pathname + search)}`} replace />
   return children
 }
 

@@ -1,15 +1,18 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Reveal, cx } from '../../components/ui'
 import { DarkBand, DotField } from '../components/DotField'
 import ProductCard from '../components/ProductCard'
 import { Em, Kicker, PillTabs, SecHead, Title } from '../components/atoms'
 import { useStore } from '../store'
-import { CATEGORIES, METHODS, PRICE_RANGES, PRODUCTS, SORTS, categoryLabel, rupiah } from '../data'
+import { api, qs } from '../api'
+import { METHODS, PRICE_RANGES, SORTS, rupiah } from '../data'
 
 const scrollToCatalog = () => document.getElementById('katalog')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
 function Hero({ q, setQ }) {
+  const { productBySlug } = useStore()
+  const unit = productBySlug('pe-novtra-2-in-1')
   const [draft, setDraft] = useState(q)
   const submit = e => { e.preventDefault(); setQ(draft); scrollToCatalog() }
   const quick = v => { setDraft(v); setQ(v); scrollToCatalog() }
@@ -56,7 +59,7 @@ function Hero({ q, setQ }) {
           </div>
           <div className="absolute left-[104%] top-[4%] whitespace-nowrap px-4 py-3 rounded-[14px] bg-forest-3/55 border border-white/14 backdrop-blur-[10px] animate-chip-in max-lap:left-[92%] max-tab:left-auto max-tab:right-0 max-tab:top-[-22%] max-tab:min-w-0" style={{ animationDelay: '1.5s' }}>
             <small className="block text-[11px] tracking-[.06em] text-white/60">Mulai dari</small>
-            <b className="text-[20px] font-semibold max-tab:text-[15px]">Rp1.799.000</b>
+            <b className="text-[20px] font-semibold max-tab:text-[15px]">{unit ? rupiah(unit.price) : '—'}</b>
           </div>
           <div className="absolute left-[106%] top-[46%] grid gap-2 whitespace-nowrap px-4 py-3 rounded-[14px] bg-forest-3/55 border border-white/14 backdrop-blur-[10px] animate-chip-in max-lap:left-[94%] max-tab:hidden" style={{ animationDelay: '1.7s' }}>
             <small className="text-[11px] tracking-[.06em] text-white/60">Garansi resmi 1 tahun</small>
@@ -77,6 +80,8 @@ function Hero({ q, setQ }) {
 }
 
 function Categories({ onPick }) {
+  const { categories, catalogState } = useStore()
+  const list = catalogState === 'loading' ? Array.from({ length: 6 }, (_, i) => ({ id: `s${i}`, skeleton: true })) : categories
   return (
     <section className="wrap pt-[clamp(90px,10vw,120px)] pb-[clamp(70px,8vw,100px)]">
       <SecHead idx="01">Kategori</SecHead>
@@ -85,14 +90,16 @@ function Categories({ onPick }) {
         <Reveal delay={.1}><p className="max-w-[40ch] text-[15px] leading-[1.6] text-muted">Mulai dari unit, lalu isi ulang media, benih, dan nutrisi tiap siklus tanam.</p></Reveal>
       </div>
       <div className="grid grid-cols-3 gap-5 max-lap:grid-cols-2 max-xs:grid-cols-1 max-xs:gap-3">
-        {CATEGORIES.map((c, i) => (
+        {list.map((c, i) => c.skeleton ? (
+          <div key={c.id} aria-hidden="true" className="min-h-[168px] rounded-[28px] bg-white/70 border border-ink/8 animate-pulse max-xs:min-h-[128px]" />
+        ) : (
           <Reveal key={c.id} delay={i * .06} tx="transition-[opacity,translate] duration-1000 ease-soft">
             <button type="button" onClick={() => onPick(c.id)}
               className="group w-full grid grid-cols-[minmax(0,1fr)_140px] items-center gap-4 min-h-[168px] p-[26px] pr-[22px] text-left bg-white border border-ink/12 rounded-[28px] transition-[box-shadow,border-color] duration-500 hover:border-ink/25 hover:shadow-[0_24px_50px_-30px_rgba(0,72,58,.4)] max-xs:min-h-0 max-xs:grid-cols-[minmax(0,1fr)_96px] max-xs:p-4">
               <span className="flex flex-col gap-1.5">
                 <span className="text-[11px] font-semibold tracking-[.14em] uppercase text-lime">0{i + 1}</span>
                 <span className="text-[22px] font-semibold tracking-[-.02em] text-forest max-xs:text-[19px]">{c.label}</span>
-                <span className="text-[13.5px] text-muted">{PRODUCTS.filter(p => p.cat === c.id).length} produk <span aria-hidden="true" className="inline-block transition-[translate] duration-500 group-hover:translate-x-1">→</span></span>
+                <span className="text-[13.5px] text-muted">{c.count} produk <span aria-hidden="true" className="inline-block transition-[translate] duration-500 group-hover:translate-x-1">→</span></span>
               </span>
               <span className="relative h-[120px] rounded-[20px] bg-[radial-gradient(closest-side,#e6f2c8,#f4f5ef_90%)] overflow-hidden max-xs:h-24">
                 <img src={c.img} alt="" loading="lazy" className="absolute top-3.5 left-3.5 w-[calc(100%-28px)] h-[calc(100%-28px)] object-contain transition-[scale] duration-700 ease-soft group-hover:scale-110" />
@@ -153,34 +160,43 @@ function Filters({ f, set, reset }) {
 
 const DEFAULT = { q: '', cat: 'all', method: 'all', price: 'all', ready: false, sort: 'relevan' }
 
-function useFiltered(f) {
-  return useMemo(() => {
-    const q = f.q.trim().toLowerCase()
-    const pr = PRICE_RANGES.find(p => p.id === f.price)
-    const list = PRODUCTS.filter(p => {
-      if (q && !(p.name + ' ' + p.blurb + ' ' + categoryLabel(p.cat)).toLowerCase().includes(q)) return false
-      if (f.cat !== 'all' && p.cat !== f.cat) return false
-      if (f.method !== 'all' && !(p.method === f.method || p.method === 'both')) return false
-      if (f.price !== 'all' && (p.soon || p.price < pr.min || p.price > pr.max)) return false
-      if (f.ready && p.soon) return false
-      return true
-    })
-    const order = PRODUCTS.map(p => p.slug)
-    return list.sort((a, b) => {
-      if (f.sort === 'murah') return (a.soon ? 1e12 : a.price) - (b.soon ? 1e12 : b.price)
-      if (f.sort === 'mahal') return (b.soon ? -1 : b.price) - (a.soon ? -1 : a.price)
-      if (f.sort === 'nama') return a.name.localeCompare(b.name)
-      return order.indexOf(a.slug) - order.indexOf(b.slug)
-    })
-  }, [f])
+/* Filtering, search and sorting run in the API; typing is debounced */
+function useProducts(f) {
+  const [state, setState] = useState({ list: [], status: 'loading', sig: '' })
+  const [retry, setRetry] = useState(0)
+  const query = qs({ q: f.q.trim(), cat: f.cat, method: f.method, price: f.price, ready: f.ready ? 1 : '', sort: f.sort })
+  useEffect(() => {
+    const ctrl = new AbortController()
+    setState(s => ({ ...s, status: 'loading' }))
+    const t = setTimeout(() => {
+      api(`/products${query}`, { signal: ctrl.signal })
+        .then(d => setState({ list: d.products, status: 'ready', sig: query || 'all' }))
+        .catch(e => { if (e.name !== 'AbortError') setState(s => ({ ...s, status: 'error' })) })
+    }, 220)
+    return () => { clearTimeout(t); ctrl.abort() }
+  }, [query, retry])
+  return { ...state, retry: () => setRetry(r => r + 1) }
 }
+
+const CardSkeleton = () => (
+  <div aria-hidden="true" className="flex flex-col bg-white border border-ink/10 rounded-[28px] overflow-hidden">
+    <span className="block aspect-square bg-[radial-gradient(closest-side,#eef3e2,#ffffff_95%)] animate-pulse" />
+    <span className="grid gap-2.5 px-[22px] pt-1 pb-[22px] max-xs:px-3.5">
+      <span className="h-3 w-20 rounded-full bg-mist" />
+      <span className="h-4 w-4/5 rounded-full bg-mist" />
+      <span className="h-4 w-3/5 rounded-full bg-mist" />
+      <span className="mt-4 h-9 w-full rounded-full bg-mist/70" />
+    </span>
+  </div>
+)
 
 function CatalogSection({ f, setF }) {
   const [sheet, setSheet] = useState(false)
+  const { categories, categoryLabel } = useStore()
   const set = patch => setF(s => ({ ...s, ...patch }))
   const reset = () => setF(DEFAULT)
-  const list = useFiltered(f)
-  const sig = JSON.stringify({ ...f, sort: f.sort })
+  const { list, status, sig, retry } = useProducts(f)
+  const loading = status === 'loading' && !sig
 
   const active = [
     f.cat !== 'all' && { label: categoryLabel(f.cat), clear: () => set({ cat: 'all' }) },
@@ -200,7 +216,7 @@ function CatalogSection({ f, setF }) {
         <div className="flex flex-wrap items-center gap-3 mb-6">
           <div className="max-tab:w-full max-tab:overflow-x-auto no-scrollbar">
             <PillTabs label="Kategori" className="max-tab:flex-nowrap" itemClass="px-4 py-[9px] whitespace-nowrap"
-              items={[{ id: 'all', label: 'Semua' }, ...CATEGORIES]} value={f.cat} onChange={v => set({ cat: v })} />
+              items={[{ id: 'all', label: 'Semua' }, ...categories]} value={f.cat} onChange={v => set({ cat: v })} />
           </div>
           <button type="button" onClick={() => setSheet(true)}
             className="tab:hidden inline-flex items-center gap-2 h-12 px-5 rounded-full bg-white border border-ink/12 text-[14px] font-medium text-forest">
@@ -223,7 +239,9 @@ function CatalogSection({ f, setF }) {
 
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2 mb-[18px] min-h-9">
-              <p className="mr-1 text-[14px] text-ink-2"><strong className="font-semibold text-forest">{list.length}</strong> produk</p>
+              <p className="mr-1 text-[14px] text-ink-2" aria-live="polite">
+                <strong className="font-semibold text-forest">{loading ? '…' : list.length}</strong> produk
+              </p>
               {active.map(a => (
                 <button key={a.label} type="button" onClick={a.clear} aria-label={`Hapus filter ${a.label}`}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-forest text-white text-[12.5px] animate-swap hover:bg-forest-2">
@@ -232,14 +250,24 @@ function CatalogSection({ f, setF }) {
               ))}
             </div>
 
-            {list.length === 0 ? (
+            {status === 'error' ? (
+              <div className="bg-white border border-ink/12 rounded-[28px] px-6 py-16 text-center animate-rise">
+                <h3 className="mb-2 text-[26px] font-semibold text-forest">Katalog belum <Em>termuat.</Em></h3>
+                <p className="mb-6 text-[14.5px] text-muted">Periksa koneksi internetmu lalu coba lagi.</p>
+                <button type="button" onClick={retry} className="px-6 py-3.5 rounded-full bg-forest text-white text-[14.5px] font-medium hover:bg-forest-2">Coba lagi</button>
+              </div>
+            ) : loading ? (
+              <div className="grid grid-cols-3 auto-rows-fr gap-[18px] max-lap:grid-cols-2 max-xs:gap-2.5">
+                {Array.from({ length: 6 }, (_, i) => <CardSkeleton key={i} />)}
+              </div>
+            ) : list.length === 0 ? (
               <div className="bg-white border border-ink/12 rounded-[28px] px-6 py-16 text-center animate-rise">
                 <h3 className="mb-2 text-[26px] font-semibold text-forest">Belum ketemu <Em>yang dicari.</Em></h3>
                 <p className="mb-6 text-[14.5px] text-muted">Coba kata lain atau longgarkan filter.</p>
                 <button type="button" onClick={reset} className="px-6 py-3.5 rounded-full bg-forest text-white text-[14.5px] font-medium hover:bg-forest-2">Atur ulang filter</button>
               </div>
             ) : (
-              <div key={sig} className="grid grid-cols-3 auto-rows-fr gap-[18px] max-lap:grid-cols-2 max-xs:gap-2.5">
+              <div key={sig} className={cx('grid grid-cols-3 auto-rows-fr gap-[18px] transition-opacity duration-300 max-lap:grid-cols-2 max-xs:gap-2.5', status === 'loading' && 'opacity-60')}>
                 {list.map((p, i) => <ProductCard key={p.slug} p={p} className="animate-rise" style={{ animationDelay: `${Math.min(i, 8) * 55}ms` }} />)}
               </div>
             )}
@@ -260,7 +288,7 @@ function CatalogSection({ f, setF }) {
             <div className="flex-1 overflow-y-auto px-5 py-2">
               <Kicker className="mb-2.5">Kategori</Kicker>
               <div className="flex flex-wrap gap-2 mb-5">
-                {[{ id: 'all', label: 'Semua' }, ...CATEGORIES].map(c => (
+                {[{ id: 'all', label: 'Semua' }, ...categories].map(c => (
                   <button key={c.id} type="button" onClick={() => set({ cat: c.id })}
                     className={cx('px-4 py-[9px] rounded-full text-[13.5px] transition-colors', f.cat === c.id ? 'bg-forest text-white' : 'bg-white border border-ink/15 text-ink-2')}>{c.label}</button>
                 ))}
@@ -279,8 +307,9 @@ function CatalogSection({ f, setF }) {
 }
 
 function RefillBand() {
-  const { addToCart } = useStore()
-  const kit = PRODUCTS.find(p => p.slug === 'grow-kit-refill')
+  const { addToCart, productBySlug } = useStore()
+  const kit = productBySlug('grow-kit-refill')
+  if (!kit) return null
   return (
     <section className="relative isolate overflow-hidden bg-forest-2 text-white py-[clamp(90px,10vw,120px)]">
       <DotField density={.6} />

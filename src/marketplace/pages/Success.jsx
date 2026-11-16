@@ -1,9 +1,10 @@
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { Reveal, cx } from '../../components/ui'
 import { DarkBand } from '../components/DotField'
-import { Em, SecHead, Title } from '../components/atoms'
+import { Em, LoadError, PageLoader, SecHead, Title } from '../components/atoms'
 import { useStore } from '../store'
-import { orderTotal, rupiah } from '../data'
+import { fmtDateTime, rupiah } from '../data'
+import { useOrder } from './Payment'
 
 const AFTER = [
   ['Rakit', 'Ikuti panduan QR di dalam kotak untuk memasang rangka, bak, dan naungan.'],
@@ -13,19 +14,20 @@ const AFTER = [
 
 export default function Success() {
   const { id } = useParams()
-  const { orders, user } = useStore()
-  const order = orders.find(o => o.id === id)
-  if (!order) return <Navigate to="/marketplace/profil" replace />
-  if (order.status === 'bayar') return <Navigate to={`/marketplace/pembayaran/${id}`} replace />
+  const { user } = useStore()
+  const { order, status, reload } = useOrder(id)
+  if (status === 'missing') return <Navigate to="/marketplace/profil" replace />
+  if (status === 'error') return <LoadError onRetry={reload}>Pesanan belum bisa dimuat.</LoadError>
+  if (!order) return <PageLoader dark />
+  if (order.status === 'bayar' || order.status === 'batal') return <Navigate to={`/marketplace/pembayaran/${id}`} replace />
 
-  const total = orderTotal(order)
-  const timeline = [
-    ['16 Nov · 14.30', 'Pesanan dibuat', 'Checkout berhasil.', 'done'],
-    ['16 Nov · 14.41', 'Pembayaran diterima', `${order.pay} · ${rupiah(total)}`, 'now'],
-    ['Berikutnya', 'Dikemas', 'Unit dicek dan dikemas.', 'next'],
-    ['Berikutnya', 'Dikirim', 'Nomor resi muncul di Profil.', 'next'],
-    ['20–22 Nov', 'Diterima', 'Garansi mulai berlaku.', 'next'],
-  ]
+  const total = order.total
+  const eta = order.eta?.replace(/^estimasi tiba /, '') ?? ''
+  // what already happened (oldest first), then the steps still ahead
+  const past = [...order.events].reverse().map((e, i, a) => [fmtDateTime(e.at), e.title, e.place, i === a.length - 1 ? 'now' : 'done'])
+  const ahead = { proses: [['Dikemas', 'Unit dicek dan dikemas.'], ['Dikirim', 'Nomor resi muncul di Profil.'], ['Diterima', 'Garansi mulai berlaku.']], kirim: [['Diterima', 'Garansi mulai berlaku.']] }[order.status] ?? []
+  const timeline = [...past, ...ahead.map(([t, d], i) => [i === ahead.length - 1 && eta ? eta : 'Berikutnya', t, d, 'next'])]
+  const fill = Math.min(100, ((past.length - .5) / timeline.length) * 100)
 
   return (
     <main className="bg-paper">
@@ -52,7 +54,7 @@ export default function Success() {
           </div>
           <dl className="grid grid-cols-2 mt-14 w-full max-w-[560px] rounded-[28px] bg-forest-3/55 border border-white/14 backdrop-blur-[10px] animate-chip-in max-xs:grid-cols-1" style={{ animationDelay: '.85s' }}>
             <div className="px-7 py-6 border-r border-white/12 max-xs:border-r-0 max-xs:border-b"><dt className="mb-1 text-[13px] text-white/60">Total dibayar</dt><dd className="text-[28px] font-semibold tracking-[-.03em] text-lime-2">{rupiah(total)}</dd></div>
-            <div className="px-7 py-6"><dt className="mb-1 text-[13px] text-white/60">Estimasi tiba</dt><dd className="text-[28px] font-semibold tracking-[-.03em]">20–22 Nov 2026</dd></div>
+            <div className="px-7 py-6"><dt className="mb-1 text-[13px] text-white/60">Estimasi tiba</dt><dd className="text-[28px] font-semibold tracking-[-.03em]">{eta || '—'}</dd></div>
           </dl>
         </div>
       </DarkBand>
@@ -60,11 +62,11 @@ export default function Success() {
       <section className="wrap pt-[clamp(80px,9vw,110px)] pb-[clamp(60px,7vw,80px)]">
         <SecHead idx="01">Status pesanan</SecHead>
         <Reveal><Title className="mb-12 text-[clamp(32px,4vw,52px)]">Dari gudang ke <Em>halaman rumahmu.</Em></Title></Reveal>
-        <ol className="relative grid grid-cols-5 gap-4 max-lap:grid-cols-1 max-lap:gap-0">
+        <ol className="relative grid gap-4 max-lap:!grid-cols-1 max-lap:gap-0" style={{ gridTemplateColumns: `repeat(${timeline.length}, minmax(0, 1fr))` }}>
           <li aria-hidden="true" className="absolute left-0 right-0 top-[21px] h-px bg-ink/15 max-lap:hidden" />
-          <li aria-hidden="true" className="absolute left-0 w-[30%] top-[21px] h-px bg-lime max-lap:hidden" />
+          <li aria-hidden="true" className="absolute left-0 top-[21px] h-px bg-lime max-lap:hidden" style={{ width: `${fill}%` }} />
           {timeline.map(([t, title, d, st], i) => (
-            <Reveal as="li" key={title} delay={i * .08} className="relative max-lap:grid max-lap:grid-cols-[44px_1fr] max-lap:gap-4 max-lap:pb-7">
+            <Reveal as="li" key={title + i} delay={i * .08} className="relative max-lap:grid max-lap:grid-cols-[44px_1fr] max-lap:gap-4 max-lap:pb-7">
               {i < timeline.length - 1 && <span aria-hidden="true" className={cx('hidden max-lap:block absolute left-[21px] top-11 bottom-0 w-px', st === 'next' ? 'bg-ink/15' : 'bg-lime')} />}
               <span className={cx('relative grid place-items-center w-11 h-11 mb-5 rounded-full text-[13px] font-bold max-lap:mb-0',
                 st === 'done' ? 'bg-forest text-white' : st === 'now' ? 'bg-lime text-forest-3 shadow-[0_0_0_6px_rgba(128,178,20,.18)]' : 'bg-paper border border-ink/18 text-muted')}>

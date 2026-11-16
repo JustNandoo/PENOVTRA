@@ -1,11 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { Reveal, cx } from '../../components/ui'
 import { DotField } from '../components/DotField'
-import ProductCard from '../components/ProductCard'
-import { Em, Kicker, Option, QtyStepper, SecHead, Title } from '../components/atoms'
+import ProductCard, { useNotify } from '../components/ProductCard'
+import { Em, Kicker, LoadError, Option, PageLoader, QtyStepper, SecHead, Title } from '../components/atoms'
 import { useStore } from '../store'
-import { PARTS, PRODUCTS, categoryLabel, productBySlug, rupiah } from '../data'
+import { api } from '../api'
+import { PARTS, SHIPPING, methodLabel, rupiah } from '../data'
 
 const pad = i => String(i + 1).padStart(2, '0')
 
@@ -36,13 +37,13 @@ function Gallery({ p }) {
 }
 
 function BuyBox({ p }) {
-  const { addToCart } = useStore()
+  const { addToCart, categoryLabel } = useStore()
   const nav = useNavigate()
   const [variant, setVariant] = useState(p.variants?.[0].id)
   const [qty, setQty] = useState(1)
   const [city, setCity] = useState('')
   const [checked, setChecked] = useState(false)
-  const [notify, setNotify] = useState(false)
+  const [notify, runNotify] = useNotify(p.slug)
   const v = p.variants?.find(x => x.id === variant)
   const price = v?.price ?? p.price
   const words = p.short.split(' ')
@@ -51,7 +52,7 @@ function BuyBox({ p }) {
   return (
     <div className="grid gap-[22px] pt-1.5">
       <div>
-        <Kicker className="mb-3">{categoryLabel(p.cat)} · {p.method === 'hydro' ? 'Hidroponik' : p.method === 'soil' ? 'Media tanam' : 'Media tanam + hidroponik'}</Kicker>
+        <Kicker className="mb-3">{categoryLabel(p.cat)} · {methodLabel(p.method)}</Kicker>
         <h1 className="mb-2 text-[clamp(36px,4vw,52px)] font-semibold leading-[1.04] tracking-[-.04em] text-forest">{words.join(' ')} {tail && <Em>{tail}</Em>}</h1>
         <p className="text-[16px] text-ink-2">{p.name}</p>
       </div>
@@ -59,8 +60,8 @@ function BuyBox({ p }) {
       {p.soon ? (
         <div className="py-5 border-y border-ink/12">
           <p className="mb-4 text-[15px] text-ink-2">{p.desc}</p>
-          <button type="button" onClick={() => setNotify(n => !n)} className={cx('h-[54px] px-7 rounded-full text-[15.5px] font-medium transition-colors', notify ? 'bg-forest text-white' : 'bg-lime text-forest-3 hover:bg-lime-2')}>
-            {notify ? 'Kami akan mengabarimu ✓' : 'Ingatkan saat rilis'}
+          <button type="button" onClick={runNotify} disabled={notify === 'busy'} className={cx('h-[54px] px-7 rounded-full text-[15.5px] font-medium transition-colors', notify === 'done' ? 'bg-forest text-white' : 'bg-lime text-forest-3 hover:bg-lime-2')}>
+            {notify === 'done' ? 'Kami akan mengabarimu lewat email ✓' : notify === 'error' ? 'Gagal, coba lagi' : 'Ingatkan saat rilis'}
           </button>
         </div>
       ) : (
@@ -82,7 +83,8 @@ function BuyBox({ p }) {
             </fieldset>
           )}
 
-          <div className="flex flex-wrap items-center gap-3">
+          {!p.inStock && <p className="px-5 py-3.5 rounded-[18px] bg-[#fff1e6] text-[14px] text-[#9a3412]">Stok sedang habis. Hubungi kami untuk perkiraan restok.</p>}
+          <div className={cx('flex flex-wrap items-center gap-3', !p.inStock && 'opacity-50 pointer-events-none')}>
             <QtyStepper size="lg" value={qty} onChange={setQty} />
             <button type="button" onClick={() => { addToCart(p.slug, qty, variant); nav('/marketplace/keranjang') }}
               className="group flex-1 min-w-[180px] h-[54px] inline-flex items-center justify-center gap-2.5 rounded-full bg-lime text-forest-3 text-[15.5px] font-medium hover:bg-lime-2 transition-colors">
@@ -106,8 +108,7 @@ function BuyBox({ p }) {
             </form>
             {checked && (
               <ul className="grid gap-1.5 text-[13.5px] text-ink-2 animate-swap">
-                <li className="flex justify-between"><span>Reguler · 2–3 hari</span><b className="text-forest">Rp38.000</b></li>
-                <li className="flex justify-between"><span>Kargo · 3–5 hari</span><b className="text-forest">Rp52.000</b></li>
+                {SHIPPING.map(s => <li key={s.id} className="flex justify-between"><span>{s.name} · {s.eta}</span><b className="text-forest">{rupiah(s.price)}</b></li>)}
               </ul>
             )}
             <p className="text-[13.5px] text-ink-2">Ragu memilih? <a href="/#kontak" className="font-semibold">Konsultasi lewat WhatsApp</a></p>
@@ -227,7 +228,8 @@ function AppSection() {
 }
 
 function Related({ p, idx }) {
-  const list = [...PRODUCTS.filter(x => x.slug !== p.slug && !x.soon && x.cat !== 'unit')].slice(0, 4)
+  const { catalog } = useStore()
+  const list = catalog.filter(x => x.slug !== p.slug && !x.soon && x.cat !== 'unit').slice(0, 4)
   return (
     <section className="wrap pt-[clamp(90px,10vw,110px)] pb-[clamp(90px,10vw,120px)]">
       <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-5 mb-[90px] max-tab:grid-cols-1 max-tab:mb-16">
@@ -257,10 +259,28 @@ function Related({ p, idx }) {
   )
 }
 
+/* Shows the cached catalog entry right away, then the fresh copy from /api/products/:slug */
+function useProduct(slug) {
+  const { productBySlug } = useStore()
+  const [state, setState] = useState({ p: null, status: 'loading' })
+  const [retry, setRetry] = useState(0)
+  useEffect(() => {
+    const ctrl = new AbortController()
+    setState({ p: null, status: 'loading' })
+    api(`/products/${slug}`, { signal: ctrl.signal })
+      .then(d => setState({ p: d.product, status: 'ready' }))
+      .catch(e => { if (e.name !== 'AbortError') setState({ p: null, status: e.status === 404 ? 'missing' : 'error' }) })
+    return () => ctrl.abort()
+  }, [slug, retry])
+  return { p: state.p ?? productBySlug(slug), status: state.status, retry: () => setRetry(r => r + 1) }
+}
+
 export default function ProductDetail() {
   const { slug } = useParams()
-  const p = productBySlug(slug)
-  if (!p) return <Navigate to="/marketplace" replace />
+  const { categoryLabel } = useStore()
+  const { p, status, retry } = useProduct(slug)
+  if (status === 'missing') return <Navigate to="/marketplace" replace />
+  if (!p) return status === 'error' ? <LoadError onRetry={retry}>Produk belum bisa dimuat.</LoadError> : <PageLoader />
   let n = 1
   return (
     <main className="bg-paper" key={slug}>

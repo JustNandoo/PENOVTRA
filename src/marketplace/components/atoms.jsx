@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { cx } from '../../components/ui'
 import { useStore } from '../store'
-import { productBySlug } from '../data'
 
 /* Section head with numbered circle, as on penovtra.com */
 export function SecHead({ idx, light, children, className }) {
@@ -116,20 +115,57 @@ export function Steps({ current = 0 }) {
 
 /* "Added to cart" toast, bottom center */
 export function CartToast() {
-  const { toast, clearToast } = useStore()
+  const { toast, clearToast, productBySlug } = useStore()
   useEffect(() => {
     if (!toast) return
     const id = setTimeout(clearToast, 3200)
     return () => clearTimeout(id)
   }, [toast, clearToast])
-  if (!toast) return null
-  const p = productBySlug(toast.slug)
+  const p = toast && productBySlug(toast.slug)
+  if (!p) return null
   return (
     <div role="status" key={toast.at} className="fixed z-50 left-1/2 bottom-6 -translate-x-1/2 w-[min(calc(100%_-_32px),520px)] animate-toast-in">
       <div className="flex items-center gap-3 p-2 pl-2 rounded-full bg-forest text-white shadow-[0_24px_50px_-24px_rgba(0,40,30,.7)]">
         <span className="relative w-11 h-11 flex-none rounded-full bg-white/10 overflow-hidden"><img src={p.img} alt="" className="absolute inset-1.5 w-8 h-8 object-contain" /></span>
         <span className="flex-1 min-w-0 text-[14px] truncate"><b className="font-semibold">{p.short}</b> masuk ke keranjang</span>
         <Link to="/marketplace/keranjang" onClick={clearToast} className="flex-none px-4 py-2.5 rounded-full bg-lime text-forest-3 text-[13.5px] font-medium hover:bg-lime-2">Lihat →</Link>
+      </div>
+    </div>
+  )
+}
+
+export const Spinner = ({ className }) => (
+  <span aria-hidden="true" className={cx('inline-block w-4 h-4 rounded-full border-2 border-current/25 border-t-current animate-spin', className)} />
+)
+
+/* Inline error under a form or button */
+export function FormError({ children, className }) {
+  if (!children) return null
+  return (
+    <p role="alert" className={cx('flex gap-2.5 px-[18px] py-3.5 rounded-[18px] bg-[#fdeceb] text-[13.5px] leading-[1.55] text-[#9b1c13] animate-swap', className)}>
+      <span aria-hidden="true" className="flex-none grid place-items-center w-5 h-5 mt-px rounded-full bg-[#b42318] text-white text-[11px] font-bold">!</span>
+      <span>{children}</span>
+    </p>
+  )
+}
+
+/* Full-height placeholder while a page waits for the API */
+export function PageLoader({ dark, label = 'Memuat…' }) {
+  return (
+    <div role="status" className={cx('min-h-[70vh] grid place-items-center', dark ? 'bg-forest-2 text-white/70' : 'bg-paper text-muted')}>
+      <span className="flex items-center gap-3 text-[14px]"><Spinner />{label}</span>
+    </div>
+  )
+}
+
+/* Shown when a request for page data fails */
+export function LoadError({ onRetry, children = 'Data belum bisa dimuat.' }) {
+  return (
+    <div className="min-h-[60vh] grid place-items-center bg-paper px-5">
+      <div className="max-w-[420px] text-center">
+        <h2 className="mb-2 text-[28px] font-semibold tracking-[-.03em] text-forest">Ada <Em>gangguan.</Em></h2>
+        <p className="mb-6 text-[15px] text-muted">{children} Periksa koneksi lalu coba lagi.</p>
+        {onRetry && <button type="button" onClick={onRetry} className="h-12 px-6 rounded-full bg-forest text-white text-[14.5px] font-medium hover:bg-forest-2">Coba lagi</button>}
       </div>
     </div>
   )

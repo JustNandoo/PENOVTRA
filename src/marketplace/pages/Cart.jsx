@@ -1,14 +1,16 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { Reveal, cx } from '../../components/ui'
 import { DotField } from '../components/DotField'
-import { Em, Kicker, ProductImg, QtyStepper, SecHead, Steps, Title } from '../components/atoms'
+import { Em, Kicker, PageLoader, ProductImg, QtyStepper, SecHead, Steps, Title } from '../components/atoms'
 import { useStore } from '../store'
-import { PRODUCTS, categoryLabel, rupiah } from '../data'
+import { rupiah } from '../data'
 
 export default function Cart() {
-  const { items, count, subtotal, setQty, removeLine, addToCart, user } = useStore()
+  const { items, cart, count, subtotal, setQty, removeLine, addToCart, user, catalog, catalogState, categoryLabel } = useStore()
   const nav = useNavigate()
-  const suggest = PRODUCTS.filter(p => ['grow-kit-refill', 'benih-premium', 'kipas-sirkulasi'].includes(p.slug))
+  const suggest = catalog.filter(p => ['grow-kit-refill', 'benih-premium', 'kipas-sirkulasi'].includes(p.slug))
+  // cart lines are joined with the catalog; wait for it instead of flashing "empty"
+  if (catalogState === 'loading' && cart.length) return <PageLoader />
   const go = () => nav(user ? '/marketplace/checkout' : '/marketplace/masuk?next=/marketplace/checkout')
 
   return (

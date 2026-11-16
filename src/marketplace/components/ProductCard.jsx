@@ -1,15 +1,37 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { cx } from '../../components/ui'
 import { useStore } from '../store'
-import { categoryLabel, rupiah } from '../data'
+import { api } from '../api'
+import { rupiah } from '../data'
 import { Kicker, ProductImg } from './atoms'
+
+/* "Ingatkan saya" for coming-soon products: saved to the waitlist for the signed-in email.
+   Guests are sent to sign in first and come back to the same page. */
+export function useNotify(slug) {
+  const { user } = useStore()
+  const nav = useNavigate()
+  const { pathname } = useLocation()
+  const [state, setState] = useState('idle') // idle | busy | done | error
+  const run = async () => {
+    if (!user) return nav(`/marketplace/masuk?next=${encodeURIComponent(pathname)}`)
+    if (state === 'busy' || state === 'done') return
+    setState('busy')
+    try {
+      await api(`/products/${slug}/notify`, { method: 'POST', body: {} })
+      setState('done')
+    } catch {
+      setState('error')
+    }
+  }
+  return [state, run]
+}
 
 /* Catalog card. Fixed square photo, 2-line name and blurb so every card in a row lines up. */
 export default function ProductCard({ p, style, className }) {
-  const { addToCart } = useStore()
+  const { addToCart, categoryLabel } = useStore()
   const [done, setDone] = useState(false)
-  const [notify, setNotify] = useState(false)
+  const [notify, runNotify] = useNotify(p.slug)
   const href = `/marketplace/produk/${p.slug}`
 
   const add = () => {
@@ -38,10 +60,10 @@ export default function ProductCard({ p, style, className }) {
           {p.soon ? (
             <>
               <span className="text-[13px] text-muted max-xs:hidden">Harga diumumkan saat rilis</span>
-              <button type="button" onClick={() => setNotify(n => !n)} aria-pressed={notify}
+              <button type="button" onClick={runNotify} aria-pressed={notify === 'done'} disabled={notify === 'busy'}
                 className={cx('flex-none px-4 py-2.5 rounded-full text-[13px] font-medium transition-colors duration-300 max-xs:w-full',
-                  notify ? 'bg-forest text-white' : 'border border-ink/20 text-forest hover:border-forest')}>
-                {notify ? 'Diingatkan ✓' : 'Ingatkan saya'}
+                  notify === 'done' ? 'bg-forest text-white' : 'border border-ink/20 text-forest hover:border-forest')}>
+                {notify === 'done' ? 'Diingatkan ✓' : notify === 'error' ? 'Coba lagi' : 'Ingatkan saya'}
               </button>
             </>
           ) : (
@@ -50,8 +72,8 @@ export default function ProductCard({ p, style, className }) {
                 <span className="text-[21px] font-bold tracking-[-.03em] text-forest max-xs:text-[15px]">{rupiah(p.price)}</span>
                 <span className="text-[12px] text-muted max-xs:hidden">{p.unit}</span>
               </span>
-              <button type="button" onClick={add} aria-label={`Tambah ${p.name} ke keranjang`}
-                className={cx('flex-none w-12 h-12 rounded-full grid place-items-center text-[22px] leading-none transition-[background-color,scale] duration-300 active:scale-90 max-xs:w-9 max-xs:h-9 max-xs:text-[18px]',
+              <button type="button" onClick={add} disabled={!p.inStock} aria-label={p.inStock ? `Tambah ${p.name} ke keranjang` : `${p.name} stok habis`} title={p.inStock ? undefined : 'Stok habis'}
+                className={cx('flex-none w-12 h-12 rounded-full grid place-items-center text-[22px] leading-none transition-[background-color,scale] duration-300 active:scale-90 disabled:bg-mist disabled:text-muted disabled:cursor-not-allowed max-xs:w-9 max-xs:h-9 max-xs:text-[18px]',
                   done ? 'bg-forest text-white' : 'bg-lime text-forest-3 hover:bg-lime-2')}>
                 {done ? '✓' : '+'}
               </button>
